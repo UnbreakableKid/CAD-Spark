@@ -68,7 +68,7 @@ public abstract class AbstractBaseTest<Input, Result> {
 		String expectedResult = expectedResult();
 		if (expectedResult != null) {
 			System.err.println("Asserting the correctness of the test's result");
-			assertEquals(result.toString(), expectedResult());
+			assertEquals(expectedResult(), result.toString());
 		}
 		// terminate the session
 		spark.stop();
