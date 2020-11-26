@@ -6,7 +6,7 @@ import scala.Tuple2;
 
 import java.util.Map;
 
-public class FlightsPerRoute extends AbstractFlightAnalyser<Map<String, Long>> {
+public class FlightsPerRoute extends AbstractFlightAnalyser<Map<Tuple2<String, String>, Long>> {
 
 
 	public FlightsPerRoute(JavaRDD<Flight> flights) {
@@ -14,11 +14,11 @@ public class FlightsPerRoute extends AbstractFlightAnalyser<Map<String, Long>> {
 	}
 	
 	
-	public Map<String, Long> run() {
-		JavaPairRDD<String, String> allRoutes =
-					this.flights.mapToPair(flight -> new Tuple2<>(flight.origin, flight.dest));
-			
-		return allRoutes.;
+	public Map<Tuple2<String, String>, Long> run() {
+		JavaPairRDD<Tuple2<String, String>, Long> allRoutes =
+				this.flights.mapToPair(flight -> new Tuple2<>(new Tuple2<>(flight.origin, flight.dest) , (long)1));
+
+		return allRoutes.countByKey();
 	}
 
 }

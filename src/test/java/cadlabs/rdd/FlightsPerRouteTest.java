@@ -1,6 +1,5 @@
 package cadlabs.rdd;
 
-import cadlabs.rdd.mysolutions.FlightsPerRoute;
 import org.apache.spark.api.java.JavaRDD;
 import scala.Tuple2;
 
@@ -11,7 +10,7 @@ public class FlightsPerRouteTest extends AbstractTest<Map<Tuple2<String, String>
 	@Override
 	protected Map<Tuple2<String, String>, Long> run(JavaRDD<Flight> flights) {
 
-		return null; // TODO: new FlightsPerRoute(flights).run();
+		return new FlightsPerRoute(flights).run();
 	}
 
 	@Override
