@@ -10,7 +10,6 @@ public abstract class AbstractFlightAnalyser<T> {
 		this.flights = flights;
 	}
 	
-	
 	public abstract T run();
 	
 }

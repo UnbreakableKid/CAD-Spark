@@ -31,9 +31,7 @@ public abstract class AbstractBaseTest<Input, Result> {
 	protected abstract Result run(Input flights);
 	
 	protected abstract String expectedResult();
-	
-	
-	
+
 	@Test
 	public void run() {
 		
