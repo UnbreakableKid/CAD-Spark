@@ -15,6 +15,7 @@ public class FlightsPerAirport extends AbstractFlightAnalyser<Map<String, Long>>
 	}
 	
 	
+	
 	public Map<String, Long> run() {
 		JavaPairRDD<String, String> allRoutes = 
 					this.flights.mapToPair(flight -> new Tuple2<>(flight.origin, flight.dest));

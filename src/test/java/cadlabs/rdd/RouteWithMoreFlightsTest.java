@@ -8,7 +8,7 @@ public class RouteWithMoreFlightsTest extends AbstractTest<Tuple2<Tuple2<String,
 
 	@Override
 	protected Tuple2<Tuple2<String, String>, Long> run(JavaRDD<Flight> flights) {
-		return null; // new RouteWithMoreFlights(flights).run();
+		return new RouteWithMoreFlights(flights).run();
 	}
 
 	@Override
