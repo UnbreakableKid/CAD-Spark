@@ -3,6 +3,10 @@ bin
 .classpath
 .project
 .settings
+build
+gradle
+gradlew
+gradlew.bat
 
 .idea/*
 
