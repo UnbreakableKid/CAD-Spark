@@ -15,10 +15,10 @@ public class FlightsPerRoute extends AbstractFlightAnalyser<Map<String, Long>> {
 	
 	
 	public Map<String, Long> run() {
-		JavaPairRDD<String, String> allRoutes = 
+		JavaPairRDD<String, String> allRoutes =
 					this.flights.mapToPair(flight -> new Tuple2<>(flight.origin, flight.dest));
 			
-		return allRoutes.distinct().countByKey();
+		return allRoutes.;
 	}
 
 }
