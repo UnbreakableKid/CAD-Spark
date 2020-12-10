@@ -8,100 +8,100 @@ public class Flight {
 	/**
 	 * day of Month
 	 */
-	final String dofM;
+	public final String dofM;
 	
 	/**
 	 * day of Week
 	 */
-	final String dofW;
+	public final String dofW;
 	
 	/**
 	 * The carrier
 	 */
-	final String carrier;
+	public final String carrier;
 	
 	/**
 	 * Airplane tail number
 	 */
-	final String tailnum;
+	public final String tailnum;
 	
 	/**
 	 * Flight number
 	 */
-	final int flnum;
+	public final int flnum;
 	
 	
 	/**
 	 * Identifier of the airport of origin
 	 */
-	final long org_id;
+	public final long org_id;
 	
 	
 	/**
 	 * Name of the airport of origin
 	 */
-	final String origin;
+	public final String origin;
 	
 	/**
 	 * Identifier of the airport of destination
 	 */
-	final long dest_id;
+	public final long dest_id;
 	
 	/**
 	 * Name of the airport of destination
 	 */
-	final String dest;
+	public final String dest;
 	
 	/**
 	 * Scheduled departure time
 	 */
-	final double crsdeptime;
+	public final double crsdeptime;
 	
 	/**
 	 * Departure time
 	 */
-	final double deptime;
+	public final double deptime;
 	
 	/**
 	 * Delay at departure
 	 */
-	final double depdelaymins;
+	public final double depdelaymins;
 	
 	/**
 	 * Scheduled arrival time
 	 */
-	final double crsarrtime;
+	public final double crsarrtime;
 	
 	/**
 	 * Arrival time
 	 */
-	final double arrtime;
+	public final double arrtime;
 	
 	/**
 	 * Delay at arrival
 	 */
-	final double arrdelay;
+	public final double arrdelay;
 	
 	/**
 	 * Scheduled elapsed (flight) time
 	 */
-	final double crselapsedtime;
+	public final double crselapsedtime;
 	
 	/**
 	 * Distance between airports
 	 */
-	final int dist;
+	public final int dist;
 	
 	/**
 	 * Identifier in a range [0..numberAirports-1] of the airport of arrival
 	 */
-	final long origInternalId; 
+	public final long origInternalId; 
 	
 	
 	/**
 	 * Identifier in a range [0..numberAirports-1] of the airport of destination
 	 */
-	final long destInternalId; 
+	public final long destInternalId; 
 	
 	
 	/**
@@ -173,5 +173,22 @@ public class Flight {
 			}
 			return id;
 		}
+	}
+
+
+	public static long getNumberAirports() {
+		return airports.size();
+	}
+
+	/**
+	 * Obtain the name of the airport from its internal ID
+	 * @return
+	 */
+	public static String getAirportNameFromId(int id) {
+		return airportsRev.get(id);
+	}
+
+	public static int getAirportIdFromName(String name) {
+		return airportsByName.get(name);
 	}
 }
