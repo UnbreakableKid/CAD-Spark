@@ -100,8 +100,7 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
                 }
             }
         }
-
-        return new Path(source, destination, predecessor);
+        return new Path(source, destination, l[destination], predecessor);
     }
 
     /**
@@ -131,7 +130,7 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
 
         JavaRDD<MatrixEntry> entries =
                 flightAverageDuration.map(
-                        flight ->new MatrixEntry(flight._1._2, flight._1._1, flight._2));
+                        flight ->new MatrixEntry(flight._1._1, flight._1._2, flight._2));
 
         return entries.collect();
     }

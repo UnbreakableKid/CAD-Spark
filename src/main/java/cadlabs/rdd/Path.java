@@ -14,16 +14,22 @@ public class Path {
     private final List<String> path = new ArrayList<>();
 
     /**
+     * The weigth of the path between the two nodes
+     */
+    private double pathWeight;
+
+    /**
      * Constructor given the source and destination node ids and the list of predecessors
      * @param source
      * @param destination
      * @param predecessor
      */
-    public Path(long source, long destination, int[] predecessor) {
+    public Path(long source, long destination, double pathWeight,  int[] predecessor) {
         for (int v =  (int) destination; v != source; v = predecessor[v])
             this.path.add(0, Flight.getAirportNameFromId(v));
 
         this.path.add(0, Flight.getAirportNameFromId((int) source));
+        this.pathWeight = pathWeight;
     }
 
     /**
@@ -32,6 +38,11 @@ public class Path {
      */
     public List<String> getPathAsList() {
         return this.path;
+    }
+
+
+    public double getWeight() {
+        return this.pathWeight;
     }
 
     @Override

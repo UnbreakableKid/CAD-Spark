@@ -1,9 +1,10 @@
 package cadlabs.rdd;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Flight {
+public class Flight implements Serializable {
 
 	/**
 	 * day of Month
