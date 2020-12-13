@@ -22,3 +22,5 @@ public class AverageDurationFlightsPerRoute extends AbstractFlightAnalyser<Map<T
 	}
 
 }
+
+// ou seja num RDD podemos ter o número de voos entre 2 aeroportos, e a soma dos tempos desses voos todos? num par?
