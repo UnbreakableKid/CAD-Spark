@@ -15,7 +15,7 @@ public class SSSPTest extends AbstractTest<Path> {
 		long time = System.currentTimeMillis();
 		Path route = new SSSP("TPA", "PSG", flights).run();
 		long elapsed =  System.currentTimeMillis() - time;
-		System.out.println("Route " + route + "\nComputed in " + elapsed + " ms.");
+		System.out.println("Route " + route + " with weight " + route.getWeight() + "\nComputed in " + elapsed + " ms.");
 		return route;
 	}
 

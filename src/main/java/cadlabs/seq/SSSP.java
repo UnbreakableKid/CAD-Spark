@@ -90,7 +90,7 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
 
             toVisit.remove((Integer) u);
 
-            //                System.out.println("Going through " + u);
+//          System.out.println("Visiting " + u + ". Nodes left to visit: " + toVisit.size());
 
             for (Integer v : toVisit) {
                 double newPath = l[u] + getWeight(u, v);
