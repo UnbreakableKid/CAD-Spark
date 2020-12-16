@@ -11,7 +11,6 @@ public class GraphAverageRoute extends AbstractFlightAnalyser<IndexedRowMatrix> 
 
 
 	public GraphAverageRoute(JavaRDD<Flight> flights) {
-
 		super(flights);
 	}
 	
@@ -26,7 +25,7 @@ public class GraphAverageRoute extends AbstractFlightAnalyser<IndexedRowMatrix> 
 						)
 				.mapToPair(flightz -> new Tuple2<>(flightz._1, (flightz._2._1 / flightz._2._2)));
 
-		JavaRDD<MatrixEntry> entries = flightAverage.map(flight -> new MatrixEntry(flight._1._1, flight._1._2, flight._2 ));
+		JavaRDD<MatrixEntry> entries = flightAverage.map(flight -> new MatrixEntry(flight._1._2, flight._1._1, flight._2 ));
 
 		CoordinateMatrix test = new CoordinateMatrix(entries.rdd());
 		return test.toIndexedRowMatrix();

@@ -1,11 +1,11 @@
-package cadlabs.seq;
+package cadlabs.sql;
 
 import cadlabs.AbstractSSSP;
 import cadlabs.rdd.Flight;
 import cadlabs.rdd.Path;
 import org.apache.spark.api.java.JavaRDD;
 
-public class SSSPMain extends AbstractSSSP {
+public class SSSPMainSpark extends AbstractSSSP {
 
     /**
      * Source node
@@ -26,7 +26,7 @@ public class SSSPMain extends AbstractSSSP {
      * @param source Source node
      * @param destination Destination node
      */
-    public SSSPMain(String URL, int numberNodes, int percentageOfConnections, String source, String destination) {
+    public SSSPMainSpark(String URL, int numberNodes, int percentageOfConnections, String source, String destination) {
         super(URL, numberNodes, percentageOfConnections);
         this.source = source;
         this.destination = destination;
@@ -37,12 +37,13 @@ public class SSSPMain extends AbstractSSSP {
     protected Path run(JavaRDD<Flight> flights) {
 //        CoordinateMatrix cm = buildGraph(flights);
 //        JavaPairRDD<Integer, Integer> x = new calculateD(flights, cm, Flight.getAirportIdFromName(this.source)).run();
-        return new SSSP(this.source, this.destination, flights).run();
+        return new SSSPSpark(this.source, this.destination, flights).run();
     }
 
 
     public static void main(String[] args) {
-        new SSSPMain("local", 1000, 10, "Node1",
-                "Node435").run();
+        if(args[0].compareTo("info")==0)
+        new SSSPMainSpark("local", 10, 70, "Node1",
+                "Node9").run();
     }
 }

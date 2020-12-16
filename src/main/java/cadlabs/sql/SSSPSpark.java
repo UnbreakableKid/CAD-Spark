@@ -1,4 +1,4 @@
-package cadlabs.seq;
+package cadlabs.sql;
 
 
 import cadlabs.rdd.AbstractFlightAnalyser;
@@ -7,17 +7,24 @@ import cadlabs.rdd.Flight;
 import cadlabs.rdd.Path;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
+import org.apache.spark.mllib.linalg.distributed.IndexedRow;
+import org.apache.spark.mllib.linalg.distributed.IndexedRowMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
+import org.apache.spark.rdd.RDD;
+import org.apache.spark.storage.StorageLevel;
 import scala.Tuple2;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+
 /**
  * A sequential implementation of Dijkstra Single Source Shortest Path
  */
-public class SSSP extends AbstractFlightAnalyser<Path> {
+public class SSSPSpark extends AbstractFlightAnalyser<Path> {
 
     /**
      * Representation of absence of edge between two nodes
@@ -32,7 +39,10 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
     /**
      * The graph
      */
-    private final List<MatrixEntry> graph;
+    private final CoordinateMatrix graph;
+
+    private final IndexedRowMatrix iGraph;
+
 
     /**
      * The name of the source node (airport)
@@ -45,11 +55,13 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
     private final String destinationName;
 
 
-    public SSSP(String source, String destination, JavaRDD<Flight> flights) {
+    public SSSPSpark(String source, String destination, JavaRDD<Flight> flights) {
         super(flights);
         this.sourceName = source;
         this.destinationName = destination;
         this.graph = buildGraph();
+        this.iGraph = graph.toIndexedRowMatrix();
+
     }
 
     @Override
@@ -59,18 +71,14 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
         int destination = Flight.getAirportIdFromName(destinationName);
         int nAirports = (int) Flight.getNumberAirports();
 
-        // The set of nodes to visit
+        int[] predecessor = new int[nAirports];
+        double[] l = new double[nAirports];
+
+        Arrays.fill(l, NOEDGE);
+        Arrays.fill(predecessor, NOPREDECESSOR);
+
         List<Integer> toVisit = IntStream.range(0, nAirports).boxed().collect(Collectors.toList());
         toVisit.remove(source);
-
-        // the l vector and a vector to store a node's predecessor in the current path
-        double[] l = new double[nAirports];
-        int[] predecessor = new int[nAirports];
-
-        for (int i = 0; i < l.length; i++) {
-            l[i] = NOEDGE;
-            predecessor[i] = NOPREDECESSOR;
-        }
 
         l[source] = 0;
         for (Integer v : toVisit) {
@@ -81,33 +89,56 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
             }
         }
 
+        JavaPairRDD<Integer, Double> d = calculateD(l,source);
+        for (IndexedRow e: iGraph.rows().toJavaRDD().collect()
+        ) {
+            System.out.println(e);
+
+        }
+        JavaRDD<IndexedRow> x = iGraph.rows().toJavaRDD();
+        JavaPairRDD<Integer, Double> finalD = d;
+        x.mapToPair(indexedRow -> finalD.join(indexedRow.index()));
         // Dijkstra's algorithm
         while (toVisit.size() > 0) {
+            Tuple2<Integer, Double> min = findMin(d,source, toVisit);
 
-            int u = toVisit.get(0);
-            for (Integer v : toVisit)
-                if (l[v] < l[u]) u = v;
-
+            int u = min._1;
             toVisit.remove((Integer) u);
 
-//          System.out.println("Visiting " + u + ". Nodes left to visit: " + toVisit.size());
+            System.out.println("Visiting " + u + ". Nodes left to visit: " + toVisit.size());
 
             for (Integer v : toVisit) {
                 double newPath = l[u] + getWeight(u, v);
                 if (l[v] > newPath) {
                     l[v] = newPath;
                     predecessor[v] = u;
+                    d.unpersist();
+                    d = calculateD(l, source).persist(StorageLevel.MEMORY_ONLY_2());
+
                 }
             }
         }
         return new Path(source, destination, l[destination], predecessor);
     }
 
+    private Tuple2<Integer, Double> findMin(JavaPairRDD<Integer, Double> d, int source, List<Integer> toVisit) {
+        JavaPairRDD<Integer, Double> sorted =  // sort by value
+                d.filter(v1 -> v1._1 != source).mapToPair(x -> x.swap()).sortByKey(true).
+                        mapToPair(x -> x.swap()).filter(v1 -> toVisit.contains(v1._1));
+
+        return sorted.take(1).get(0);
+    }
+
+    private JavaPairRDD<Integer, Double> calculateD(double[] dh, int source) {
+         return this.flights.mapToPair(flight -> new Tuple2<>((int) flight.destInternalId, dh[(int) flight.destInternalId] )).reduceByKey((v1, v2) -> v1);
+
+    }
+
     /**
      * Build the graph using Spark for convenience
      * @return The graph
      */
-    private List<MatrixEntry> buildGraph() {
+    private CoordinateMatrix buildGraph() {
 
         JavaPairRDD<Tuple2<Long, Long>, Tuple2<Double, Integer>> aux1 =
                 this.flights.
@@ -132,7 +163,9 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
                 flightAverageDuration.map(
                         flight -> new MatrixEntry(flight._1._1, flight._1._2, flight._2));
 
-        return entries.collect();
+        CoordinateMatrix cm = new CoordinateMatrix(entries.rdd());
+        cm.transpose();
+        return cm;
     }
 
 
@@ -142,7 +175,7 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
      * @return The edge (of type MatrixEntry), if it exists, null otherwise
      */
     private MatrixEntry getEdge(int origin, int dest) {
-        for (MatrixEntry e : this.graph) {
+        for (MatrixEntry e : this.graph.entries().toJavaRDD().collect()) {
             if (e.i() == origin && e.j() == dest)
                 return e;
         }
@@ -155,7 +188,7 @@ public class SSSP extends AbstractFlightAnalyser<Path> {
      * @return The weight of the edge, if the edge exists, NOEDGE otherwise
      */
     private double getWeight(int origin, int dest) {
-        for (MatrixEntry e : this.graph) {
+        for (MatrixEntry e :  this.graph.entries().toJavaRDD().collect()) {
             if (e.i() == origin && e.j() == dest)
                 return e.value();
         }
