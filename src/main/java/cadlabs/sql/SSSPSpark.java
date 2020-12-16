@@ -7,13 +7,13 @@ import cadlabs.rdd.Flight;
 import cadlabs.rdd.Path;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
-import org.apache.spark.mllib.linalg.distributed.IndexedRow;
 import org.apache.spark.mllib.linalg.distributed.IndexedRowMatrix;
 import org.apache.spark.mllib.linalg.distributed.MatrixEntry;
-import org.apache.spark.rdd.RDD;
 import org.apache.spark.storage.StorageLevel;
 import scala.Tuple2;
+import scala.Tuple3;
 
 import java.util.Arrays;
 import java.util.List;
@@ -78,61 +78,67 @@ public class SSSPSpark extends AbstractFlightAnalyser<Path> {
         Arrays.fill(predecessor, NOPREDECESSOR);
 
         List<Integer> toVisit = IntStream.range(0, nAirports).boxed().collect(Collectors.toList());
-        toVisit.remove(source);
+        toVisit.set(source, -1);
 
         l[source] = 0;
         for (Integer v : toVisit) {
             MatrixEntry e = getEdge(source, v);
             if (e != null) {
                 l[(int) e.j()] = e.value();
-                predecessor[(int) e.j()] = source;
             }
         }
 
-        JavaPairRDD<Integer, Double> d = calculateD(l,source);
-        for (IndexedRow e: iGraph.rows().toJavaRDD().collect()
-        ) {
-            System.out.println(e);
+        JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> d = calculateD(l, source,toVisit,predecessor );
 
-        }
-        JavaRDD<IndexedRow> x = iGraph.rows().toJavaRDD();
-        JavaPairRDD<Integer, Double> finalD = d;
-        x.mapToPair(indexedRow -> finalD.join(indexedRow.index()));
+        JavaPairRDD<Integer, Vector> indexRdd = iGraph.rows().toJavaRDD().mapToPair(r -> new Tuple2<>((int)r.index(), r.vector()));
+        JavaPairRDD<Integer, Tuple2<Tuple3<Double, Boolean, Integer>, Vector>> all = d.join(indexRdd);
+
+        int visited = 1;
         // Dijkstra's algorithm
-        while (toVisit.size() > 0) {
-            Tuple2<Integer, Double> min = findMin(d,source, toVisit);
+        while (visited < toVisit.size()) {
+            List<Tuple2<Integer, Tuple3<Double, Boolean, Integer>>> min = findMin(d,source).take(10);
 
-            int u = min._1;
-            toVisit.remove((Integer) u);
+            Tuple2<Integer, Tuple3<Double, Boolean, Integer>> x = min.get(0);
+
+            int u = x._1;
+            toVisit.set(u, -1);
+            visited++;
 
             System.out.println("Visiting " + u + ". Nodes left to visit: " + toVisit.size());
 
             for (Integer v : toVisit) {
                 double newPath = l[u] + getWeight(u, v);
-                if (l[v] > newPath) {
+                if (v != -1 && l[v] > newPath) {
                     l[v] = newPath;
                     predecessor[v] = u;
                     d.unpersist();
-                    d = calculateD(l, source).persist(StorageLevel.MEMORY_ONLY_2());
 
                 }
             }
+
+            d = calculateD(l, toVisit, u).persist(StorageLevel.MEMORY_ONLY_2());
+
         }
         return new Path(source, destination, l[destination], predecessor);
     }
 
-    private Tuple2<Integer, Double> findMin(JavaPairRDD<Integer, Double> d, int source, List<Integer> toVisit) {
-        JavaPairRDD<Integer, Double> sorted =  // sort by value
-                d.filter(v1 -> v1._1 != source).mapToPair(x -> x.swap()).sortByKey(true).
-                        mapToPair(x -> x.swap()).filter(v1 -> toVisit.contains(v1._1));
+    private JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> findMin(JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> d, int source) {
+        JavaPairRDD<Double, Tuple3<Boolean, Integer, Integer>> sorted =  // sort by value
+                d.filter(v1 ->  v1._1 != source && !v1._2._2())
+                        .mapToPair(x -> x.swap())
+                        .mapToPair(x -> new Tuple2<Double, Tuple3<Boolean,Integer,Integer>>(x._1._1(),  new Tuple3(x._1._2(), x._1._3() ,x._2))).sortByKey(true);
 
-        return sorted.take(1).get(0);
+        JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> fixed =sorted.mapToPair(x -> new Tuple2<>(x._2._3(), new Tuple3<>(x._1, x._2._1(), x._2._2())));
+
+        return fixed;
     }
 
-    private JavaPairRDD<Integer, Double> calculateD(double[] dh, int source) {
-         return this.flights.mapToPair(flight -> new Tuple2<>((int) flight.destInternalId, dh[(int) flight.destInternalId] )).reduceByKey((v1, v2) -> v1);
+    private JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> calculateD(double[] dh, int visited, List<Integer> toVisit, int predecssor) {
+         return this.flights.mapToPair(flight -> new Tuple2<>((int) flight.destInternalId, new Tuple3<Double, Boolean, Integer>(dh[(int) flight.destInternalId], toVisit.get((int) flight.destInternalId) == -1,
+                 -1))).reduceByKey((v1, v2) -> v1);
 
     }
+
 
     /**
      * Build the graph using Spark for convenience
