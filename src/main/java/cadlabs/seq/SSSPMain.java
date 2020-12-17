@@ -3,7 +3,10 @@ package cadlabs.seq;
 import cadlabs.AbstractSSSP;
 import cadlabs.rdd.Flight;
 import cadlabs.rdd.Path;
+import cadlabs.sql.SSSPMainSpark;
 import org.apache.spark.api.java.JavaRDD;
+
+import java.util.Scanner;
 
 public class SSSPMain extends AbstractSSSP {
 
@@ -42,7 +45,12 @@ public class SSSPMain extends AbstractSSSP {
 
 
     public static void main(String[] args) {
-        new SSSPMain("local", 1000, 10, "Node1",
-                "Node435").run();
+        Scanner scanner = new Scanner(System.in);
+        String input = scanner.nextLine();
+        String[] x = input.split(" ");
+        if (x[0].compareTo("info") == 0)
+            new SSSPMain("local", 10, 60, x[1],
+                    x[2]).run();
+
     }
 }

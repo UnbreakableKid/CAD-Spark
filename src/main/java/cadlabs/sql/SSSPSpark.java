@@ -7,6 +7,8 @@ import cadlabs.rdd.Flight;
 import cadlabs.rdd.Path;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.function.Function;
+import org.apache.spark.mllib.linalg.SparseVector;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.mllib.linalg.distributed.CoordinateMatrix;
 import org.apache.spark.mllib.linalg.distributed.IndexedRowMatrix;
@@ -15,8 +17,7 @@ import org.apache.spark.storage.StorageLevel;
 import scala.Tuple2;
 import scala.Tuple3;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -39,7 +40,7 @@ public class SSSPSpark extends AbstractFlightAnalyser<Path> {
     /**
      * The graph
      */
-    private final CoordinateMatrix graph;
+    private CoordinateMatrix graph;
 
     private final IndexedRowMatrix iGraph;
 
@@ -71,11 +72,9 @@ public class SSSPSpark extends AbstractFlightAnalyser<Path> {
         int destination = Flight.getAirportIdFromName(destinationName);
         int nAirports = (int) Flight.getNumberAirports();
 
-        int[] predecessor = new int[nAirports];
         double[] l = new double[nAirports];
 
         Arrays.fill(l, NOEDGE);
-        Arrays.fill(predecessor, NOPREDECESSOR);
 
         List<Integer> toVisit = IntStream.range(0, nAirports).boxed().collect(Collectors.toList());
         toVisit.set(source, -1);
@@ -88,62 +87,96 @@ public class SSSPSpark extends AbstractFlightAnalyser<Path> {
             }
         }
 
-        JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> d = calculateD(l, source,toVisit,predecessor );
+        this.graph = null;
 
-        JavaPairRDD<Integer, Vector> indexRdd = iGraph.rows().toJavaRDD().mapToPair(r -> new Tuple2<>((int)r.index(), r.vector()));
-        JavaPairRDD<Integer, Tuple2<Tuple3<Double, Boolean, Integer>, Vector>> all = d.join(indexRdd);
+        JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> d = calculateD(l, toVisit, source);
+
+        JavaPairRDD<Integer, Vector> indexRdd = iGraph.rows().toJavaRDD().mapToPair(r -> new Tuple2<>((int)r.index(), r.vector())).persist(StorageLevel.MEMORY_ONLY()).cache();
 
         int visited = 1;
         // Dijkstra's algorithm
         while (visited < toVisit.size()) {
-            List<Tuple2<Integer, Tuple3<Double, Boolean, Integer>>> min = findMin(d,source).take(10);
+            Tuple2<Integer, Tuple3<Double, Boolean, Integer>> min = findMin(d, source).take(10).get(0);
 
-            Tuple2<Integer, Tuple3<Double, Boolean, Integer>> x = min.get(0);
-
-            int u = x._1;
+            int u = min._1;
             toVisit.set(u, -1);
             visited++;
 
-            System.out.println("Visiting " + u + ". Nodes left to visit: " + toVisit.size());
+            JavaPairRDD<Integer, Tuple2<Tuple3<Double, Boolean, Integer>, Vector>> all = d.join(indexRdd);
 
-            for (Integer v : toVisit) {
-                double newPath = l[u] + getWeight(u, v);
-                if (v != -1 && l[v] > newPath) {
-                    l[v] = newPath;
-                    predecessor[v] = u;
-                    d.unpersist();
-
-                }
-            }
-
-            d = calculateD(l, toVisit, u).persist(StorageLevel.MEMORY_ONLY_2());
+            d = checkIfUpdated(d, all.collectAsMap(), u, min._2._1(), nAirports, toVisit);
 
         }
-        return new Path(source, destination, l[destination], predecessor);
+
+        int[] predec = new int[nAirports];
+
+        assert d != null;
+        for (Tuple2<Integer, Tuple3<Double, Boolean, Integer>> v : d.collect()) {
+            predec[v._1] = v._2._3();
+        }
+
+        indexRdd.unpersist();
+        return new Path(source, destination,getFinalWeight(d, destination) , predec);
+    }
+
+    private Double getFinalWeight(JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> d, int destination){
+        return d.filter(v1 -> v1._1 == destination).take(1).get(0)._2._1();
+
     }
 
     private JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> findMin(JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> d, int source) {
-        JavaPairRDD<Double, Tuple3<Boolean, Integer, Integer>> sorted =  // sort by value
-                d.filter(v1 ->  v1._1 != source && !v1._2._2())
-                        .mapToPair(x -> x.swap())
-                        .mapToPair(x -> new Tuple2<Double, Tuple3<Boolean,Integer,Integer>>(x._1._1(),  new Tuple3(x._1._2(), x._1._3() ,x._2))).sortByKey(true);
+        JavaPairRDD<Double, Tuple3<Boolean, Integer, Integer>> sorted =  // sort by value <index, (6, boolean, predecssor)>
+                    d.filter(v1 ->  v1._1 != source && !v1._2._2())
+                        .mapToPair(x -> new Tuple2<>(x._2._1(),  new Tuple3<>(x._2._2(), x._2._3() ,x._1))).sortByKey(true);
 
-        JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> fixed =sorted.mapToPair(x -> new Tuple2<>(x._2._3(), new Tuple3<>(x._1, x._2._1(), x._2._2())));
 
-        return fixed;
+        return sorted.mapToPair(x -> new Tuple2<>(x._2._3(), new Tuple3<>(x._1, x._2._1(), x._2._2())));
     }
 
-    private JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> calculateD(double[] dh, int visited, List<Integer> toVisit, int predecssor) {
-         return this.flights.mapToPair(flight -> new Tuple2<>((int) flight.destInternalId, new Tuple3<Double, Boolean, Integer>(dh[(int) flight.destInternalId], toVisit.get((int) flight.destInternalId) == -1,
-                 -1))).reduceByKey((v1, v2) -> v1);
+    private JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> calculateD(double[] dh, List<Integer> toVisit, int source) {
+         return this.flights.mapToPair(flight -> new Tuple2<>((int) flight.destInternalId, new Tuple3<>(dh[(int) flight.destInternalId], toVisit.get((int) flight.destInternalId) == -1,
+                 dh[(int) flight.destInternalId] != NOEDGE && flight.destInternalId != source? source : NOPREDECESSOR))).reduceByKey((v1, v2) -> v1);
 
     }
-
 
     /**
-     * Build the graph using Spark for convenience
-     * @return The graph
+     *
+     * @param d
+     * @param all
+     * @param minIndex
+     * @param minValue
+     * @param n number of airports
+     * @param toVisit haven't visited
+     * @return updated d
      */
+    private JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> checkIfUpdated(JavaPairRDD<Integer, Tuple3<Double, Boolean, Integer>> d, Map<Integer, Tuple2<Tuple3<Double, Boolean, Integer>, Vector>> all, int minIndex, double minValue, int n, List<Integer> toVisit) {
+
+        double[] toChange = new double[n];
+        Arrays.fill(toChange, Double.MAX_VALUE);
+
+        for (Map.Entry<Integer, Tuple2<Tuple3<Double, Boolean, Integer>, Vector>> v : all.entrySet()) {
+            if (toVisit.get(v.getKey()) != -1) {
+                SparseVector z = v.getValue()._2.toSparse();
+                int[] i = z.indices();
+                int toCheck = -1;
+                for (int j = 0; j < i.length; j++) {
+                    if (i[j] == minIndex) {
+                        toCheck = j;
+                        break;
+                    }
+                }
+                if (toCheck != -1) {
+                    double x = z.values()[toCheck];
+                    toChange[v.getKey()] = x;
+                }
+            }
+        }
+        return d.mapToPair(x -> new Tuple2<>(x._1, new Tuple3<>(toChange[x._1] + minValue <= x._2._1()? toChange[x._1] + minValue : x._2._1() , toVisit.get(x._1)==-1, toChange[x._1] + minValue < x._2._1() || toChange[x._1] + minValue == x._2._1()  ?   minIndex : x._2._3())));
+    }
+        /**
+         * Build the graph using Spark for convenience
+         * @return The graph
+         */
     private CoordinateMatrix buildGraph() {
 
         JavaPairRDD<Tuple2<Long, Long>, Tuple2<Double, Integer>> aux1 =
@@ -170,8 +203,7 @@ public class SSSPSpark extends AbstractFlightAnalyser<Path> {
                         flight -> new MatrixEntry(flight._1._1, flight._1._2, flight._2));
 
         CoordinateMatrix cm = new CoordinateMatrix(entries.rdd());
-        cm.transpose();
-        return cm;
+        return cm.transpose();
     }
 
 

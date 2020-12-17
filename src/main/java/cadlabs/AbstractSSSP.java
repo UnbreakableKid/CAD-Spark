@@ -65,7 +65,7 @@ public abstract class AbstractSSSP {
         Path result = run(flights);
         long elapsed = System.currentTimeMillis() - start;
 
-        System.out.println("Route " + result + " with weight " + result.getWeight() + "\nComputed in " + elapsed + " ms.");
+        System.out.println("Route: " + result + " with time: " + result.getWeight() + "m"+ "\nComputed in " + elapsed + " ms.");
 
         // terminate the session
         spark.stop();
