@@ -152,7 +152,7 @@ public class Flight implements Serializable {
 
 	}
 
-	static Flight parseFlight(String line) {
+	public static Flight parseFlight(String line) {
 		String[] data = line.split(",");
 		return new Flight(data[0], data[1], data[2], data[3], Integer.parseInt(data[4]), Long.parseLong(data[5]),
 				data[6], Long.parseLong(data[7]), data[8], Double.parseDouble(data[9]), Double.parseDouble(data[10]),

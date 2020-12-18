@@ -32,7 +32,7 @@ public abstract class AbstractSSSP {
      * @param numberNodes Number of nodes in the graph
      * @param percentageOfConnections To how many nodes (in percentage) a node is connected to.
      */
-    public AbstractSSSP(String URL, int numberNodes, int percentageOfConnections) {
+    public AbstractSSSP(String URL, int numberNodes, int percentageOfConnections, Boolean flights) {
 
         this.spark = SparkSession.builder().
                 appName("FlightAnalyser").
@@ -42,9 +42,13 @@ public abstract class AbstractSSSP {
         this.numberNodes = numberNodes;
         this.percentageOfConnections = Math.min(100, Math.max(0, percentageOfConnections));
 
-        this.flights = new DatasetGenerator(this.numberNodes, this.percentageOfConnections, 0).
-                build(this.spark.sparkContext());
+        if(flights) {
+            JavaRDD<String> textFile = spark.read().textFile("data/flights.csv").javaRDD();
+            this.flights = textFile.map(Flight::parseFlight).cache();
 
+        }
+        else this.flights = new DatasetGenerator(this.numberNodes, this.percentageOfConnections, 0).
+                build(this.spark.sparkContext());;
         // only error messages are logged from this point onward
         // comment (or change configuration) if you want the entire log
         spark.sparkContext().setLogLevel("ERROR");

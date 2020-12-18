@@ -3,7 +3,6 @@ package cadlabs.sql;
 import cadlabs.rdd.AbstractTest;
 import cadlabs.rdd.Flight;
 import cadlabs.rdd.Path;
-import cadlabs.seq.SSSP;
 import org.apache.spark.api.java.JavaRDD;
 
 

@@ -3,6 +3,7 @@ package cadlabs.sql;
 import cadlabs.AbstractSSSP;
 import cadlabs.rdd.Flight;
 import cadlabs.rdd.Path;
+import cadlabs.seq.SSSPMain;
 import org.apache.commons.collections.map.MultiKeyMap;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -37,8 +38,8 @@ public class SSSPMainSpark extends AbstractSSSP {
      * @param source                  Source node
      * @param destination             Destination node
      */
-    public SSSPMainSpark(String URL, int numberNodes, int percentageOfConnections, String source, String destination) {
-        super(URL, numberNodes, percentageOfConnections);
+    public SSSPMainSpark(String URL, int numberNodes, int percentageOfConnections, String source, String destination, Boolean flights) {
+        super(URL, numberNodes, percentageOfConnections,flights);
         this.source = source;
         this.destination = destination;
         this.helper = new HashMap<>();
@@ -54,7 +55,12 @@ public class SSSPMainSpark extends AbstractSSSP {
 
 
     public static void main(String[] args) {
-        SSSPMainSpark z = new SSSPMainSpark("local", 10, 60, null, null);
+        SSSPMainSpark z;
+        if(args.length > 0 && args[0].compareTo("1") == 0) {
+
+             z = new SSSPMainSpark("local", 1000, 25, null, null, true);
+        }
+        else z = new SSSPMainSpark("local", 100, 90, null, null,false);
         JavaSparkContext sc = new JavaSparkContext(z.spark.sparkContext());
         System.out.println("Type quit to exit spark");
         while (true) {

@@ -30,8 +30,8 @@ public class SSSPMain extends AbstractSSSP {
      * @param source                  Source node
      * @param destination             Destination node
      */
-    public SSSPMain(String URL, int numberNodes, int percentageOfConnections, String source, String destination) {
-        super(URL, numberNodes, percentageOfConnections);
+    public SSSPMain(String URL, int numberNodes, int percentageOfConnections, String source, String destination, Boolean flightJavaRDD) {
+        super(URL, numberNodes, percentageOfConnections, flightJavaRDD);
         this.source = source;
         this.destination = destination;
     }
@@ -46,7 +46,14 @@ public class SSSPMain extends AbstractSSSP {
 
 
     public static void main(String[] args) {
-        SSSPMain z = new SSSPMain("local", 10, 60, null, null);
+
+        SSSPMain z;
+
+        if(args.length > 0 && args[0].compareTo("1") == 0) {
+
+            z = new SSSPMain("local", 1000, 25, null, null, true);
+        }
+        else z = new SSSPMain("local", 100, 90, null, null,false);
 
         while (true) {
             Scanner scanner = new Scanner(System.in);
