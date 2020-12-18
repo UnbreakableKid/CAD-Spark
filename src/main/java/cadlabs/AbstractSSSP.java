@@ -24,6 +24,8 @@ public abstract class AbstractSSSP {
      */
     private final int percentageOfConnections;
 
+    private  JavaRDD<Flight> flights;
+
     /**
      * Constructor
      * @param URL URL of the Spark master
@@ -39,6 +41,9 @@ public abstract class AbstractSSSP {
 
         this.numberNodes = numberNodes;
         this.percentageOfConnections = Math.min(100, Math.max(0, percentageOfConnections));
+
+        this.flights = new DatasetGenerator(this.numberNodes, this.percentageOfConnections, 0).
+                build(this.spark.sparkContext());
 
         // only error messages are logged from this point onward
         // comment (or change configuration) if you want the entire log
@@ -58,9 +63,6 @@ public abstract class AbstractSSSP {
      */
     public void run() {
 
-        JavaRDD<Flight> flights =  new DatasetGenerator(this.numberNodes, this.percentageOfConnections, 0).
-                build(this.spark.sparkContext());
-
         long start = System.currentTimeMillis();
         Path result = run(flights);
         long elapsed = System.currentTimeMillis() - start;
@@ -68,7 +70,6 @@ public abstract class AbstractSSSP {
         System.out.println("Route: " + result + " with time: " + result.getWeight() + "m"+ "\nComputed in " + elapsed + " ms.");
 
         // terminate the session
-        spark.stop();
     }
 
 }
